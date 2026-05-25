@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>BETA 1.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;600&family=Cormorant+Garamond:ital,wght@1,300&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #b388ff;
+            --secondary: #7c4dff;
+            --accent: #e040fb;
+            --text-glow: 0 0 15px rgba(179, 136, 255, 0.6), 0 0 30px rgba(124, 77, 255, 0.4);
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020005;
+            font-family: 'Montserrat', sans-serif;
+            color: white;
+            -webkit-font-smoothing: antialiased;
+            touch-action: none;
+        }
+        
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+
+        /* Pantalla de Inicio - Forzada encima de todo con z-index absoluto */
+        #intro-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle at center, rgba(25,10,35,0.9) 0%, rgba(2,0,5,1) 100%);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 99999; opacity: 1; transition: opacity 1.5s ease-in-out;
+            padding: 20px;
+        }
+        
+        #intro-screen h1 {
+            font-family: 'Cormorant Garamond', serif; font-weight: 300; font-style: italic;
+            font-size: clamp(2rem, 7vw, 3.5rem); letter-spacing: 6px;
+            margin-bottom: 2rem; text-align: center; text-shadow: var(--text-glow); color: var(--primary);
+        }
+
+        #btn-enter {
+            position: relative; z-index: 100000; display: block;
+            padding: 15px 50px; font-size: 1rem; font-weight: 300; background: transparent; color: var(--primary);
+            border: 1px solid rgba(179, 136, 255, 0.6); border-radius: 50px; cursor: pointer; transition: all 0.3s ease;
+            font-family: inherit; letter-spacing: 4px; box-shadow: 0 0 20px rgba(179, 136, 255, 0.2);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #btn-enter:hover, #btn-enter:active { 
+            background: rgba(179, 136, 255, 0.2); border-color: var(--accent); box-shadow: var(--text-glow); transform: scale(1.05); 
+        }
+
+        /* Tarjeta de Mensaje */
+        #message-card {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            width: 90%; max-width: 450px; padding: clamp(30px, 8vw, 50px) clamp(20px, 6vw, 40px); text-align: center;
+            background: linear-gradient(135deg, rgba(15, 5, 25, 0.85) 0%, rgba(5, 2, 10, 0.98) 100%);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(179, 136, 255, 0.3); border-radius: 30px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.9);
+            z-index: 5000; opacity: 0; pointer-events: none; transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+        
+        #message-card.active { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+
+        #card-icon { font-size: clamp(2.5rem, 8vw, 3.5rem); margin-bottom: 15px; }
+
+        #card-title {
+            font-family: 'Montserrat', sans-serif; font-size: 0.85rem; letter-spacing: 3px;
+            color: var(--primary); margin-bottom: 15px; text-transform: uppercase;
+        }
+
+        #card-text {
+            font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(1.3rem, 5vw, 1.8rem); line-height: 1.4;
+            font-weight: 300; margin-bottom: 30px; color: #fff;
+        }
+
+        #btn-close {
+            background: transparent; border: 1px solid rgba(255,255,255,0.4); color: rgba(255,255,255,0.9);
+            padding: 12px 40px; border-radius: 30px; cursor: pointer; font-family: 'Montserrat', sans-serif;
+            font-size: 0.8rem; letter-spacing: 2px; transition: 0.3s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #btn-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.4);
+            z-index: 40; pointer-events: none; display: none;
+        }
+        @media (pointer: fine) { #crosshair { display: block; } }
+        #crosshair.active { background: rgba(255,255,255,1); box-shadow: 0 0 10px var(--primary); transform: translate(-50%, -50%) scale(1.8); }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="intro-screen">
+        <h1>UNIVERSO BETA</h1>
+        <button id="btn-enter">EXPLORAR</button>
+    </div>
+
+    <div id="crosshair"></div>
+
+    <div id="message-card">
+        <div id="card-icon">✨</div>
+        <div id="card-title">Lo que me gusta de ti</div>
+        <p id="card-text">Mensaje</p>
+        <button id="btn-close">CERRAR</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // --- MANEJO DE LA INTERFAZ HTML (Aislada por seguridad) ---
+        let hasEntered = false;
+        const btnEnter = document.getElementById('btn-enter');
+        const introScreen = document.getElementById('intro-screen');
+        const cardModal = document.getElementById('message-card');
+        const btnClose = document.getElementById('btn-close');
+
+        const quitarPantallaInicio = () => {
+            if (hasEntered) return;
+            hasEntered = true;
+            introScreen.style.opacity = '0';
+            introScreen.style.pointerEvents = 'none';
+            setTimeout(() => introScreen.style.display = 'none', 1600);
+            
+            // Animación de entrada de la cámara suave
+            if (camera) {
+                const targetZ = camera.position.z; camera.position.z = targetZ + 80;
+                const introInterval = setInterval(() => {
+                    camera.position.z -= (camera.position.z - targetZ) * 0.05;
+                    if(Math.abs(camera.position.z - targetZ) < 0.2) clearInterval(introInterval);
+                }, 16);
+            }
+        };
+
+        // Escuchadores híbridos e inmediatos para evitar bloqueos táctiles/clics
+        btnEnter.addEventListener('click', quitarPantallaInicio);
+        btnEnter.addEventListener('touchstart', (e) => { e.preventDefault(); quitarPantallaInicio(); }, {passive: false});
+
+        btnClose.addEventListener('click', () => { cardModal.classList.remove('active'); if(controls) controls.enableRotate = true; });
+        btnClose.addEventListener('touchstart', (e) => { e.preventDefault(); cardModal.classList.remove('active'); if(controls) controls.enableRotate = true; }, {passive: false});
+
+
+        // --- CONFIGURACIÓN DE FRASES ---
+        const emojisPosibles = ['❤️', '💕', '💖', '💗', '💓', '💞', '✨', '🌹', '🌸', '🫶', '💫', '♡', '🦋', '🌷', '🌟', '💌'];
+        const paletaColores = ['#b388ff', '#7c4dff', '#e040fb', '#d500f9', '#651fff', '#ffffff'];
+        const frases = [
+            "Tu sonrisa", "Tu mirada profunda", "Tu risa contagiosa", "La calidez de tu voz", "Tu inteligencia brillante",
+            "Tu sentido del humor único", "Tus abrazos que curan todo", "La paz infinita que me das", "Tu bondad desinteresada", "Tu locura divertida",
+            "Tu forma única de ver el mundo", "La pasión que le pones a todo", "Tu gran empatía", "Tu creatividad sin límites", "Tu fuerza inquebrantable",
+            "Tu ternura al hablarme", "Tu paciencia conmigo", "El apoyo incondicional que me brindas", "La luz que irradias", "Tu energía positiva",
+            "La suavidad de tus manos", "Tus caricias inesperadas", "Tu aroma que me encanta", "Tu forma de caminar", "Cómo me escuchas con atención",
+            "Cómo me hablas al oído", "Cómo me haces sentir único", "Tu maravillosa compañía", "Tus silencios cómodos", "Tu respiración cuando duermes",
+            "Tus pequeños detalles", "Tus hermosas sorpresas", "Tu forma tan pura de amar", "Tu sinceridad total", "Tu honestidad valiente",
+            "Tu lealtad absoluta", "La confianza que me inspiras", "Tu valentía ante los retos", "Tu inmensa determinación", "Tu perseverancia",
+            "Tu optimismo contagiante", "Tu esperanza en el futuro", "Tu fe en nosotros", "Tu alegría de vivir", "Tu entusiasmo por lo simple",
+            "Tu curiosidad de niño/a", "Tu increíble imaginación", "Tu maravillosa espontaneidad", "Tu autenticidad", "Tu hermosa originalidad",
+            "Tus grandes metas", "Tus sueños más locos", "Tu forma de soñar despierto/a", "Tu forma de luchar por lo que quieres", "Tu resiliencia",
+            "Tu capacidad de perdonar", "Tu capacidad de aprender siempre", "Tu gran sabiduría", "Tu intuición perfecta", "Tu hermosa sensibilidad",
+            "Cómo te emocionas por pequeñas cosas", "Tus gestos tan tuyos", "Tus divertidas manías", "Ese lunar que tanto me gusta", "Tu cabello",
+            "Tu perfil perfecto", "Tu carita al dormir", "Tu forma de despertar", "Tu carita cuando comes algo rico", "Tu forma de bailar sin pena",
+            "Tus mensajes de buenos días", "Tus llamadas inesperadas", "Tus sabios consejos", "Tu forma de cuidarme", "Tu forma de protegerme",
+            "Tu forma de animarme cuando caigo", "Tu forma de consolarme", "Tu facilidad para hacerme reír", "Tu capacidad de hacerme pensar", "Que seas exactamente tú"
+        ];
+
+        const interactiveData = frases.map((frase, i) => ({
+            id: i,
+            emoji: emojisPosibles[Math.floor(Math.random() * emojisPosibles.length)],
+            color: paletaColores[Math.floor(Math.random() * paletaColores.length)],
+            title: frase,
+            card: "Eres la pieza que le faltaba a mi universo. " + frase + " es algo que atesoro profundamente."
+        }));
+
+
+        // --- CONFIGURACIÓN GRÁFICA (THREE.JS) ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020005, 0.0025);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 40, 120);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; controls.dampingFactor = 0.05;
+        controls.autoRotate = true; controls.autoRotateSpeed = 0.25;
+        controls.maxDistance = 350; controls.minDistance = 25;
+
+        // --- SISTEMA COMPOSER CON FALLBACK SEGURO ---
+        let composer = null;
+        let useFallbackRender = false;
+
+        try {
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 2.0, 0.7, 0.1);
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene); 
+            composer.addPass(bloomPass);
+        } catch (e) {
+            console.warn("Postprocessing no soportado. Activando renderizado básico estable.");
+            useFallbackRender = true;
+        }
+
+        // Agujero Negro Central
+        const bhGeometry = new THREE.SphereGeometry(11, 32, 32);
+        const bhMaterial = new THREE.MeshBasicMaterial({ color: 0x010003 });
+        const blackHole = new THREE.Mesh(bhGeometry, bhMaterial);
+        scene.add(blackHole);
+
+        // Disco de Acreción (Shader)
+        const diskGeometry = new THREE.PlaneGeometry(110, 110, 64, 64);
+        const diskShaderMaterial = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0.0 }, color1: { value: new THREE.Color(0xb388ff) }, color2: { value: new THREE.Color(0x4a148c) } },
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `
+                uniform float time; uniform vec3 color1; uniform vec3 color2; varying vec2 vUv;
+                void main() {
+                    vec2 p = -1.0 + 2.0 * vUv; float r = length(p); float a = atan(p.y, p.x);
+                    if(r < 0.22) discard;
+                    float f = sin(r * 28.0 - time * 2.3 + a * 4.0) + sin(r * 45.0 - time * 3.8 + a * 7.0) * 0.5;
+                    vec3 col = mix(color2, color1, f * 0.5 + 0.5);
+                    float glow = 0.09 / (r - 0.18); float edgeFade = smoothstep(1.0, 0.3, r);
+                    gl_FragColor = vec4(col * edgeFade * glow * (f * 0.4 + 0.8) * 1.8, edgeFade * glow);
+                }
+            `,
+            transparent: true, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const accretionDisk = new THREE.Mesh(diskGeometry, diskShaderMaterial);
+        accretionDisk.rotation.x = Math.PI / 2.15;
+        scene.add(accretionDisk);
+
+        // Estrellas de Fondo
+        const starGeo = new THREE.BufferGeometry(); const starPos = new Float32Array(10000 * 3);
+        for(let i = 0; i < 10000; i++) {
+            const r = 30 + Math.pow(Math.random(), 2) * 250; const theta = Math.random() * 2 * Math.PI; const phi = Math.acos((Math.random() * 2 - 1) * 0.15);
+            starPos[i*3] = r * Math.sin(phi) * Math.cos(theta); starPos[i*3+1] = r * Math.cos(phi) * (Math.random() * 0.5); starPos[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        const starMat = new THREE.PointsMaterial({ size: 0.6, color: 0xe1bee7, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+        const stars = new THREE.Points(starGeo, starMat); scene.add(stars);
+
+        // Sprites de Emojis Interactivos
+        const interactiveSprites = [];
+        function createEmojiHologramSprite(emojiText, colorHex) {
+            const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(128, 128, 10, 128, 128, 115);
+            gradient.addColorStop(0, colorHex); gradient.addColorStop(0.5, colorHex + '44'); gradient.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
+            ctx.font = '80px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff'; ctx.fillText(emojiText, 128, 135);
+            const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+            const sprite = new THREE.Sprite(material); sprite.scale.set(15, 15, 1); return sprite;
+        }
+
+        interactiveData.forEach((data, index) => {
+            const sprite = createEmojiHologramSprite(data.emoji, data.color);
+            const angle = (index / interactiveData.length) * Math.PI * 4 + Math.random();
+            const distance = 42 + (Math.random() * 95); const height = (Math.random() - 0.5) * 50;
+            sprite.position.set(Math.cos(angle) * distance, height, Math.sin(angle) * distance);
+            sprite.userData = { data: data, angle: angle, distance: distance, baseY: height, speed: 0.0008 + Math.random() * 0.0015, bobSpeed: 1.2 + Math.random() * 1.5, originalScale: 15 };
+            scene.add(sprite); interactiveSprites.push(sprite);
+        });
+
+
+        // --- MANEJO DE RAYCASTING (SELECCIÓN) ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2(-9999, -9999); // Evita falsos positivos al iniciar
+        const crosshair = document.getElementById('crosshair');
+
+        window.addEventListener('pointermove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // Evento gatillado para abrir los mensajes (Unificado)
+        const procesarSeleccion = (clientX, clientY) => {
+            if (cardModal.classList.contains('active') || !hasEntered) return;
+            
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactiveSprites);
+
+            if (intersects.length > 0) {
+                controls.enableRotate = false;
+                const sprite = intersects[0].object;
+                const data = sprite.userData.data;
+                
+                sprite.scale.set(22, 22, 1);
+                setTimeout(() => sprite.scale.set(15, 15, 1), 200);
+
+                document.getElementById('card-icon').innerText = data.emoji;
+                document.getElementById('card-title').innerText = data.title;
+                document.getElementById('card-text').innerText = data.card;
+                cardModal.classList.add('active');
+            }
+        };
+
+        window.addEventListener('click', (e) => {
+            if (e.target.closest('button') || e.target.id === 'intro-screen') return;
+            procesarSeleccion(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('touchstart', (e) => {
+            if (e.target.closest('button') || e.target.id === 'intro-screen') return;
+            if(e.touches.length > 0) {
+                procesarSeleccion(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, {passive: true});
+
+
+        // --- BUCLE DE ANIMACIÓN INTEGRADO ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsedTime = clock.getElapsedTime();
+
+            controls.update();
+            diskShaderMaterial.uniforms.time.value = elapsedTime;
+            stars.rotation.y = elapsedTime * 0.002;
+
+            interactiveSprites.forEach((sprite) => {
+                const ud = sprite.userData;
+                ud.angle += ud.speed;
+                sprite.position.x = Math.cos(ud.angle) * ud.distance;
+                sprite.position.z = Math.sin(ud.angle) * ud.distance;
+                sprite.position.y = ud.baseY + Math.sin(elapsedTime * ud.bobSpeed + ud.angle) * 2.0;
+                
+                const pulse = ud.originalScale + Math.sin(elapsedTime * 2.0 + ud.angle) * 1.0;
+                if(sprite.scale.x < 19) sprite.scale.set(pulse, pulse, 1);
+            });
+
+            // Control de Crosshair visual en PC
+            if (hasEntered && !cardModal.classList.contains('active')) {
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(interactiveSprites);
+                if(intersects.length > 0) {
+                    crosshair.classList.add('active'); document.body.style.cursor = 'pointer';
+                } else {
+                    crosshair.classList.remove('active'); document.body.style.cursor = 'default';
+                }
+            }
+
+            // Renderizado condicional seguro
+            if (useFallbackRender || !composer) {
+                renderer.render(scene, camera);
+            } else {
+                composer.render();
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            if(composer) composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
